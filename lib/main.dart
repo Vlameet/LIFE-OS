@@ -282,7 +282,7 @@ class _DashboardState extends State<Dashboard> {
                 IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => removeItem(section, item)),
               ]),
               if ((item['detail'] ?? '').toString().isNotEmpty) Text(item['detail'].toString(), style: const TextStyle(color: Colors.white60)),
-              Row(children: [Expanded(child: Slider(value: value.clamp(0, 1), activeColor: red, onChanged: (v) async { item['progress'] = v; await save(); })),
+              Row(children: [Expanded(child: Slider(value: value.clamp(0, 1).toDouble(), activeColor: red, onChanged: (v) async { item['progress'] = v; await save(); })),
                 Text((value * 100).round().toString() + '%'),
               ]),
             ],
