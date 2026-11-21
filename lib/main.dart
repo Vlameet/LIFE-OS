@@ -35,6 +35,7 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   int tab = 0;
   bool ready = false;
+  String searchQuery = '';
   final sections = ['Задачи', 'Привычки', 'Цели', 'Финансы', 'Заметки'];
   final data = <String, List<Map<String, dynamic>>>{
     'Задачи': [], 'Привычки': [], 'Цели': [], 'Финансы': [], 'Заметки': [],
@@ -163,6 +164,7 @@ class _DashboardState extends State<Dashboard> {
     final dates = (item['dates'] as List? ?? []).map((e) => e.toString()).toSet();
     var count = 0;
     var day = DateTime.now();
+    if (!dates.contains(day.toIso8601String().substring(0, 10))) day = day.subtract(const Duration(days: 1));
     while (dates.contains(day.toIso8601String().substring(0, 10))) {
       count++;
       day = day.subtract(const Duration(days: 1));
@@ -188,6 +190,12 @@ class _DashboardState extends State<Dashboard> {
     .fold(0.0, (s, x) => s + ((x['amount'] as num?)?.toDouble() ?? 0));
   String money(double value) => value.toStringAsFixed(2);
 
+  Widget quickAction(String label, IconData icon, int destination) => ActionChip(
+    avatar: Icon(icon, size: 18, color: Colors.white), label: Text(label),
+    backgroundColor: const Color(0xFF202B43), side: BorderSide(color: (destination.isEven ? red : Colors.blueAccent).withOpacity(0.4)),
+    onPressed: () async { setState(() => tab = destination); await editItem(sections[destination - 1]); },
+  );
+
   Widget overview() {
     final tasks = data['Задачи']!;
     final habits = data['Привычки']!;
@@ -197,7 +205,14 @@ class _DashboardState extends State<Dashboard> {
       Text(DateTime.now().hour < 12 ? 'Доброе утро' : DateTime.now().hour < 18 ? 'Хорошего дня' : 'Добрый вечер',
         style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
       const Text('Твоя жизнь. Твои правила.', style: TextStyle(color: Colors.white54)),
+      const SizedBox(height: 5),
+      Text(DateTime.now().toIso8601String().substring(0, 10), style: const TextStyle(color: Colors.lightBlueAccent, fontWeight: FontWeight.w600)),
       const SizedBox(height: 18),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        quickAction('Задача', Icons.add_task, 1), quickAction('Привычка', Icons.repeat, 2),
+        quickAction('Цель', Icons.flag_outlined, 3), quickAction('Финансы', Icons.add_chart, 4),
+      ]),
+      const SizedBox(height: 12),
       Wrap(spacing: 8, runSpacing: 8, children: [
         stat('Выполнено задач', done.toString() + '/' + tasks.length.toString(), Icons.task_alt),
         stat('Активных привычек', habits.length.toString(), Icons.repeat),
@@ -228,11 +243,21 @@ class _DashboardState extends State<Dashboard> {
     ]);
   }
 
+  Widget searchField() => TextField(
+    onChanged: (v) => setState(() => searchQuery = v),
+    decoration: InputDecoration(hintText: 'Поиск по записям...', prefixIcon: const Icon(Icons.search),
+      suffixIcon: searchQuery.isEmpty ? null : IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => searchQuery = '')),
+      filled: true, fillColor: const Color(0xFF172033), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+  );
+
   Widget sectionView(String section) {
-    final items = data[section]!;
+    final allItems = data[section]!;
+    final q = searchQuery.trim().toLowerCase();
+    final items = q.isEmpty ? allItems : allItems.where((x) => [x['name'], x['detail'], x['priority'], x['kind']].whereType<Object>().any((v) => v.toString().toLowerCase().contains(q))).toList();
     if (section == 'Финансы') {
       return ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Финансы', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12), searchField(),
         Wrap(spacing: 8, children: [
           stat('Доходы', money(income), Icons.arrow_downward),
           stat('Расходы', money(expenses), Icons.arrow_upward),
@@ -249,6 +274,8 @@ class _DashboardState extends State<Dashboard> {
       ]);
     }
     return ListView(padding: const EdgeInsets.all(16), children: [
+      searchField(),
+      const SizedBox(height: 10),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(section, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
         IconButton(onPressed: () => editItem(section), icon: const Icon(Icons.add_circle, color: red, size: 30)),
@@ -312,8 +339,15 @@ class _DashboardState extends State<Dashboard> {
     final labels = ['Обзор', ...sections];
     final icons = [Icons.dashboard_outlined, Icons.checklist, Icons.repeat, Icons.flag_outlined, Icons.account_balance_wallet_outlined, Icons.note_alt_outlined];
     return Scaffold(
-      appBar: AppBar(title: const Text('LIFE OS', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: tab == 0 ? overview() : sectionView(sections[tab - 1]),
+      appBar: AppBar(
+        title: const Text('LIFE OS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        flexibleSpace: Container(decoration: const BoxDecoration(gradient: LinearGradient(
+          colors: [Color(0xFF14233D), Color(0xFF251A2C), Color(0xFF351B27)], begin: Alignment.centerLeft, end: Alignment.centerRight))),
+        actions: [IconButton(tooltip: 'На главную', onPressed: () => setState(() { tab = 0; searchQuery = ''; }), icon: const Icon(Icons.home_outlined))],
+      ),
+      body: Container(decoration: const BoxDecoration(gradient: LinearGradient(
+        colors: [Color(0xFF0B1422), Color(0xFF11121B), Color(0xFF1C1019)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+        child: tab == 0 ? overview() : sectionView(sections[tab - 1])),
       floatingActionButton: tab == 0 ? null : FloatingActionButton(
         backgroundColor: red, onPressed: () => editItem(sections[tab - 1]), child: const Icon(Icons.add)),
       bottomNavigationBar: NavigationBar(
