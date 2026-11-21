@@ -67,6 +67,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> editItem(String section, {Map<String, dynamic>? item}) async {
+    final isNew = item == null;
     final name = TextEditingController(text: item?['name']?.toString() ?? '');
     final detail = TextEditingController(text: item?['detail']?.toString() ?? '');
     final amount = TextEditingController(text: item?['amount']?.toString() ?? '');
@@ -148,7 +149,7 @@ class _DashboardState extends State<Dashboard> {
     if (section == 'Задачи') { target['priority'] = priority; target['due'] = due; }
     if (section == 'Цели') { target['detail'] = detail.text.trim(); target['progress'] = progress; }
     if (section == 'Заметки') target['detail'] = detail.text.trim();
-    if (item == null || !data[section]!.contains(target)) data[section]!.insert(0, target);
+    if (isNew) data[section]!.insert(0, target);
     await save();
     name.dispose(); detail.dispose(); amount.dispose();
   }
