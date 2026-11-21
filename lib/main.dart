@@ -437,7 +437,7 @@ class _DashboardState extends State<Dashboard> {
             musicController == null ? musicPlaceholder() : WebViewWidget(controller: musicController!),
           ],
         )),
-      floatingActionButton: tab == 0 ? null : FloatingActionButton(
+      floatingActionButton: (tab == 0 || tab == 6) ? null : FloatingActionButton(
         backgroundColor: red, onPressed: () => editItem(sections[tab - 1]), child: const Icon(Icons.add)),
       bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
         musicMiniBar(),
