@@ -14,7 +14,7 @@ jobs:
       - name: Generate Android platform files
         run: flutter create --platforms=android --project-name=life_os .
       - name: Allow internet access for embedded music player
-        run: sed -i '/<application/i\\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+        run: sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
