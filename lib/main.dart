@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 const red = Color(0xFFF04444);
 const bg = Color(0xFF0D0E10);
@@ -36,6 +37,10 @@ class _DashboardState extends State<Dashboard> {
   int tab = 0;
   bool ready = false;
   String searchQuery = '';
+  WebViewController? musicController;
+  bool musicStarted = false;
+  int musicProgress = 0;
+  String musicError = '';
   final sections = ['Задачи', 'Привычки', 'Цели', 'Финансы', 'Заметки'];
   final data = <String, List<Map<String, dynamic>>>{
     'Задачи': [], 'Привычки': [], 'Цели': [], 'Финансы': [], 'Заметки': [],
@@ -44,6 +49,83 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void initState() { super.initState(); load(); }
+
+  Future<void> openMusic() async {
+    if (musicStarted) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      setState(() => musicError = 'Встроенный плеер пока доступен в Android-версии.');
+      return;
+    }
+    setState(() { musicStarted = true; musicError = ''; });
+    final controller = WebViewController();
+    musicController = controller;
+    await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await controller.setBackgroundColor(const Color(0xFF10131B));
+    await controller.setNavigationDelegate(NavigationDelegate(
+      onProgress: (progress) {
+        if (mounted) setState(() => musicProgress = progress);
+      },
+      onWebResourceError: (error) {
+        if (mounted && error.isForMainFrame == true) {
+          setState(() => musicError = 'Не удалось загрузить Яндекс Музыку. Проверь интернет и обнови страницу.');
+        }
+      },
+    ));
+    await controller.loadRequest(Uri.parse('https://music.yandex.ru/'));
+    if (mounted) setState(() {});
+  }
+
+  Widget musicPlaceholder() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.music_note_rounded, size: 64, color: Colors.lightBlueAccent),
+        const SizedBox(height: 12),
+        const Text('Яндекс Музыка', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(musicError.isEmpty ? 'Открой официальный музыкальный сервис внутри LIFE OS.' : musicError,
+          textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60)),
+        const SizedBox(height: 18),
+        if (musicProgress > 0 && musicProgress < 100) ...[
+          LinearProgressIndicator(value: musicProgress / 100, color: Colors.lightBlueAccent),
+          const SizedBox(height: 16),
+        ],
+        FilledButton.icon(
+          onPressed: openMusic,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Открыть Яндекс Музыку'),
+        ),
+      ]),
+    ),
+  );
+
+  Widget musicMiniBar() => InkWell(
+    onTap: () {
+      setState(() => tab = 6);
+      openMusic();
+    },
+    child: Container(
+      margin: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF142D50), Color(0xFF24203D), Color(0xFF3A1B30)],
+        ),
+        border: Border.all(color: Colors.lightBlueAccent.withOpacity(0.25)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.music_note_rounded, color: Colors.lightBlueAccent, size: 28),
+        const SizedBox(width: 10),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Яндекс Музыка', style: TextStyle(fontWeight: FontWeight.bold)),
+          Text('Открыть музыкальный плеер', style: TextStyle(fontSize: 11, color: Colors.white60)),
+        ])),
+        const Icon(Icons.open_in_full_rounded, color: Colors.white70),
+      ]),
+    ),
+  );
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -336,8 +418,8 @@ class _DashboardState extends State<Dashboard> {
   @override
   Widget build(BuildContext context) {
     if (!ready) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    final labels = ['Обзор', ...sections];
-    final icons = [Icons.dashboard_outlined, Icons.checklist, Icons.repeat, Icons.flag_outlined, Icons.account_balance_wallet_outlined, Icons.note_alt_outlined];
+    final labels = ['Обзор', ...sections, 'Музыка'];
+    final icons = [Icons.dashboard_outlined, Icons.checklist, Icons.repeat, Icons.flag_outlined, Icons.account_balance_wallet_outlined, Icons.note_alt_outlined, Icons.music_note_rounded];
     return Scaffold(
       appBar: AppBar(
         title: const Text('LIFE OS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
@@ -347,16 +429,26 @@ class _DashboardState extends State<Dashboard> {
       ),
       body: Container(decoration: const BoxDecoration(gradient: LinearGradient(
         colors: [Color(0xFF0B1422), Color(0xFF11121B), Color(0xFF1C1019)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-        child: tab == 0 ? overview() : sectionView(sections[tab - 1])),
+        child: IndexedStack(
+          index: tab,
+          children: [
+            overview(),
+            ...sections.map((section) => sectionView(section)),
+            musicController == null ? musicPlaceholder() : WebViewWidget(controller: musicController!),
+          ],
+        )),
       floatingActionButton: tab == 0 ? null : FloatingActionButton(
         backgroundColor: red, onPressed: () => editItem(sections[tab - 1]), child: const Icon(Icons.add)),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        musicMiniBar(),
+        NavigationBar(
         selectedIndex: tab,
-        onDestinationSelected: (i) => setState(() => tab = i),
+        onDestinationSelected: (i) { setState(() => tab = i); if (i == 6) openMusic(); },
         backgroundColor: panel, indicatorColor: red.withOpacity(0.18),
         destinations: [for (var i = 0; i < labels.length; i++)
           NavigationDestination(icon: Icon(icons[i]), label: labels[i])],
-      ),
+        ),
+      ]),
     );
   }
 }
